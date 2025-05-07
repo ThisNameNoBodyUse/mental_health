@@ -64,6 +64,7 @@ func (userService *UserService) UserRegister() (bool, error) {
 	if userService.Password == "" {
 		return false, errors.New("密码不能为空")
 	}
+
 	// 引入分布式锁
 	key := constant.RegisterPrefix + userService.Account // 注册操作分布式锁的key
 	lock, err := utils.TryLock(key, 5*time.Second)       // 尝试上锁5s,获取锁对象
@@ -79,6 +80,7 @@ func (userService *UserService) UserRegister() (bool, error) {
 		// 说明该账号已被注册
 		return false, errors.New("该账号已被注册")
 	}
+
 	// 账号没被注册过，可以进行注册
 	user = new(models.User)
 	user.Account = userService.Account
@@ -87,11 +89,27 @@ func (userService *UserService) UserRegister() (bool, error) {
 		return false, err
 	}
 	user.Password = password
+
 	// 插入数据库
 	save := userDao.Save(user)
 	if save.Error != nil {
 		return false, save.Error
 	}
+
+	// 获取用户的 ID
+	userID := user.Id
+
+	// 插入 user_roles 表，role_id 设置为 1（管理员）
+	userRole := models.UserRole{
+		UserID: userID,
+		RoleID: 1, // 默认角色 ID 为 1
+	}
+	userRoleDao := dao.NewUserRoleDao(config.DB)
+	saveUserRole := userRoleDao.Save(&userRole)
+	if saveUserRole.Error != nil {
+		return false, saveUserRole.Error
+	}
+
 	return true, nil
 }
 
@@ -110,12 +128,12 @@ func (userService *UserService) GetUserInfoById(id int64) (*serializer.UserInfo,
 // AdminLogout 退出登录
 func (userService *UserService) AdminLogout(token string) error {
 	_, claims, _ := utils.ParseJWT(token, true)
-	access_jti := claims["jti"].(string) // 访问令牌的jti
+	accessJti := claims["jti"].(string) // 访问令牌的jti
 	// 将访问令牌的 jti 存入 Redis 黑名单，并设置过期时间
 	expirationTime := time.Unix(int64(claims["exp"].(float64)), 0)
 	ttl := expirationTime.Sub(time.Now())
-	access_key := constant.BlackListPrefix + access_jti // 访问令牌在redis中的key
-	err := utils.Set(access_key, "true", ttl)           // 访问令牌存入redis
+	accessKey := constant.BlackListPrefix + accessJti // 访问令牌在redis中的key
+	err := utils.Set(accessKey, "true", ttl)          // 访问令牌存入redis
 	if err != nil {
 		return errors.New("访问令牌拉黑异常")
 	}

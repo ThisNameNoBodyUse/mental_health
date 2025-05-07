@@ -2,11 +2,14 @@ package middleware
 
 import (
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"mental/constant"
+	"mental/dao"
 	"mental/utils"
 	"net/http"
+	"time"
 )
 
 // JWTMiddleWare 是 JWT鉴权中间件 对于某些需要进行登录校验的路由进行令牌鉴权
@@ -47,9 +50,120 @@ func JWTMiddleWare() gin.HandlerFunc { // gin.HandlerFunc用于定义中间件
 		// 令牌校验成功，将必要信息存入gin上下文中
 		// 将 float64 类型的 id 转换为 int64
 		userId := int64(id)
+
+		// 获取用户角色列表
+		roles, ok := claims["roles"].([]interface{})
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			return
+		}
+		// 获取用户权限列表
+		var permissions []string
+
+		for _, role := range roles {
+			roleID := fmt.Sprintf("%v", role)
+
+			// 先查询 Redis 是否有缓存的权限列表
+			rolePermissions, err := utils.SMembers(constant.RolePermissionPrefix + roleID)
+
+			// 如果 Redis 返回的是空集合，说明没有缓存，去数据库查询
+			if err != nil || len(rolePermissions) == 0 {
+				rolePermissions, err = dao.GetRolePermissionsFromDB(roleID)
+				if err != nil {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to get permissions"})
+					return
+				}
+
+				// 将数据库查询结果缓存到 Redis
+				if len(rolePermissions) > 0 {
+					err = utils.SAdd(constant.RolePermissionPrefix+roleID, rolePermissions)
+					if err != nil {
+						c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to cache permissions"})
+						return
+					}
+
+					// 设置缓存过期时间（12 小时）
+					err = utils.Expire(constant.RolePermissionPrefix+roleID, 12*time.Hour)
+					if err != nil {
+						c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to set cache expiration"})
+						return
+					}
+				}
+			}
+
+			// 将 rolePermissions 合并到 permissions 中
+			permissions = append(permissions, rolePermissions...)
+		}
+
+		// 判断当前用户的权限列表对应的接口集合中 是否存在当前需要访问的接口
+		requestKey := c.FullPath() + ":" + c.Request.Method
+		fmt.Println("requestKey : " + requestKey)
+
+		hasPermission := false
+
+		for _, permission := range permissions {
+			permID := fmt.Sprintf("%v", permission)
+			key := constant.APIPermissionPrefix + permID
+			fmt.Println("key : " + key)
+
+			// 判断 Redis 中是否存在该权限对应的接口集合
+			exists, err := utils.Exists(key)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Redis error"})
+				return
+			}
+
+			if !exists {
+				// 如果 Redis 中没有，查数据库并缓存
+				apiList, err := dao.GetPermissionAPIsFromDB(permID)
+				if err != nil {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
+					return
+				}
+
+				// 缓存到 Redis
+				if len(apiList) > 0 {
+					err = utils.SAdd(key, stringSliceToInterfaceSlice(apiList)...)
+					if err != nil {
+						c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to cache permissions"})
+						return
+					}
+					err = utils.Expire(key, 24*time.Hour)
+					if err != nil {
+						c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to set expiration"})
+						return
+					}
+				}
+			}
+			// 检查该权限对应的接口集合中是否包含当前请求
+			inSet, err := utils.SIsMember(key, requestKey)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Redis error"})
+				return
+			}
+			if inSet {
+				hasPermission = true
+				break
+			}
+		}
+
+		if !hasPermission {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
+			return
+		}
+
 		c.Set("id", userId)
 		c.Set("account", claims["account"].(string))
 		// 放行
 		c.Next()
 	}
+}
+
+// 把每个 string 转为 interface{} 存到新切片中
+func stringSliceToInterfaceSlice(strs []string) []interface{} {
+	result := make([]interface{}, len(strs))
+	for i, v := range strs {
+		result[i] = v
+	}
+	return result
 }

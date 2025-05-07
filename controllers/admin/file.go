@@ -16,6 +16,11 @@ type FileController struct {
 }
 
 // Check 检查文件是否已经上传过
+// @Summary 检查文件
+// @Description 检查文件接口
+// @Tags 文件管理
+// @Produce json
+// @Router /common/check-file [post]
 func (con FileController) Check(c *gin.Context) {
 	fileId := c.Query("file_id") // 文件的md5值即为文件id
 	var fileService service.FileService
@@ -35,6 +40,12 @@ func (con FileController) Check(c *gin.Context) {
 }
 
 // Upload 上传文件接口
+// @Summary 上传文件
+// @Description 上传文件接口
+// @Tags 文件管理
+// @Accept multipart/form-data
+// @Produce json
+// @Router /common/upload [post]
 func (con FileController) Upload(c *gin.Context) {
 	// 获取上传的文件
 	file, err := c.FormFile("file") // "file" 是前端表单中文件上传字段的名字

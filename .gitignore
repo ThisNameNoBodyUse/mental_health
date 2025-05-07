@@ -2,7 +2,7 @@
 upload/
 /storage/*
 !/storage/default_avatar.jpg
-
+/docs/
 justfile
 .DS_Store
 #*.ini
