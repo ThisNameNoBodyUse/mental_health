@@ -3,18 +3,21 @@ package service
 import (
 	"errors"
 	"github.com/jinzhu/copier"
+	"gorm.io/gorm"
 	"mental/config"
 	"mental/constant"
 	"mental/dao"
 	"mental/models"
 	"mental/serializer"
 	"mental/utils"
+	"strconv"
 	"time"
 )
 
 type UserService struct {
-	Account  string `json: "account"`
-	Password string `json: "password"`
+	Account  string `json:"account"`
+	Password string `json:"password"`
+	RoleId   string `json:"role_id"`
 }
 
 // UserLogin 登录，返回登录信息 + err
@@ -58,58 +61,76 @@ func (userService *UserService) UserLogin() (*serializer.UserLogin, error) {
 
 // UserRegister 用户注册，判断是否能成功注册
 func (userService *UserService) UserRegister() (bool, error) {
+
 	if userService.Account == "" {
 		return false, errors.New("账号不能为空")
 	}
 	if userService.Password == "" {
 		return false, errors.New("密码不能为空")
 	}
+	if userService.RoleId == "" {
+		return false, errors.New("角色不能为空")
+	}
 
-	// 引入分布式锁
-	key := constant.RegisterPrefix + userService.Account // 注册操作分布式锁的key
-	lock, err := utils.TryLock(key, 5*time.Second)       // 尝试上锁5s,获取锁对象
+	// 转换并验证 roleId
+	roleId, err := strconv.Atoi(userService.RoleId)
+	if err != nil || (roleId != 1 && roleId != 2) {
+		return false, errors.New("角色ID非法")
+	}
+
+	// 分布式锁
+	key := constant.RegisterPrefix + userService.Account
+	lock, err := utils.TryLock(key, 5*time.Second)
 	if err != nil {
 		return false, errors.New("该账号正在注册中，请勿重复操作")
 	}
-	defer utils.Unlock(lock) // 任务完成后释放锁 defer 后的语句在该函数结束后执行
+	defer utils.Unlock(lock)
 
-	userDao := dao.NewUserDao(config.DB)
-	user, err := userDao.GetUserByAccount(userService.Account)
-	// 如果用户不为空
-	if user != nil {
-		// 说明该账号已被注册
-		return false, errors.New("该账号已被注册")
-	}
+	// 包装事务处理
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
+		userDao := dao.NewUserDao(tx)
+		existingUser, err := userDao.GetUserByAccount(userService.Account)
+		if err != nil {
+			return err
+		}
+		if existingUser != nil {
+			return errors.New("该账号已被注册")
+		}
 
-	// 账号没被注册过，可以进行注册
-	user = new(models.User)
-	user.Account = userService.Account
-	password, err := utils.HashPassword(userService.Password)
+		// 创建用户
+		hashedPwd, err := utils.HashPassword(userService.Password)
+		if err != nil {
+			return err
+		}
+		// 雪花算法生成用户唯一id
+		snowflake, _ := utils.NewSnowflake()
+		id := snowflake.GenerateID()
+
+		newUser := &models.User{
+			Account:  userService.Account,
+			Password: hashedPwd,
+		}
+		newUser.Id = int(id)
+		if err := tx.Create(newUser).Error; err != nil {
+			return err
+		}
+
+		// 创建角色绑定
+		userRole := &models.UserRole{
+			UserID: newUser.Id,
+			RoleID: roleId,
+		}
+		if err := tx.Create(userRole).Error; err != nil {
+			return err
+		}
+
+		return nil // 提交事务
+	})
+
+	// 判断事务是否成功
 	if err != nil {
 		return false, err
 	}
-	user.Password = password
-
-	// 插入数据库
-	save := userDao.Save(user)
-	if save.Error != nil {
-		return false, save.Error
-	}
-
-	// 获取用户的 ID
-	userID := user.Id
-
-	// 插入 user_roles 表，role_id 设置为 1（管理员）
-	userRole := models.UserRole{
-		UserID: userID,
-		RoleID: 1, // 默认角色 ID 为 1
-	}
-	userRoleDao := dao.NewUserRoleDao(config.DB)
-	saveUserRole := userRoleDao.Save(&userRole)
-	if saveUserRole.Error != nil {
-		return false, saveUserRole.Error
-	}
-
 	return true, nil
 }
 
@@ -125,8 +146,8 @@ func (userService *UserService) GetUserInfoById(id int64) (*serializer.UserInfo,
 	return userInfo, err
 }
 
-// AdminLogout 退出登录
-func (userService *UserService) AdminLogout(token string) error {
+// UserLogout 退出登录
+func (userService *UserService) UserLogout(token string) error {
 	_, claims, _ := utils.ParseJWT(token, true)
 	accessJti := claims["jti"].(string) // 访问令牌的jti
 	// 将访问令牌的 jti 存入 Redis 黑名单，并设置过期时间

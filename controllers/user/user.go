@@ -1,4 +1,4 @@
-package admin
+package user
 
 import (
 	"github.com/gin-gonic/gin"
@@ -11,14 +11,14 @@ type UserController struct {
 	common.BaseController
 }
 
-// AdminLogin 管理员登录
-// @Summary 管理员登录
-// @Description 管理员登录接口
-// @Tags 管理员
+// Login 登录
+// @Summary 登录
+// @Description 登录接口
+// @Tags 管理员/用户
 // @Accept json
 // @Produce json
-// @Router /admin/login [post]
-func (con UserController) AdminLogin(c *gin.Context) {
+// @Router /login [post]
+func (con UserController) Login(c *gin.Context) {
 	var userService service.UserService
 	// 绑定表单到userService中
 	if err := c.ShouldBind(&userService); err != nil {
@@ -33,18 +33,18 @@ func (con UserController) AdminLogin(c *gin.Context) {
 	con.Success(c, data) // 登录成功，响应数据
 }
 
-// AdminLogout 管理员退出登录 目前只让访问令牌失效
-// @Summary 管理员退出登录
-// @Description 管理员退出登录接口
-// @Tags 管理员
+// Logout 退出登录 目前只让访问令牌失效
+// @Summary 退出登录
+// @Description 退出登录接口
+// @Tags 管理员/用户
 // @Produce json
-// @Router /admin/logout [post]
-func (con UserController) AdminLogout(c *gin.Context) {
+// @Router /logout [post]
+func (con UserController) Logout(c *gin.Context) {
 	var userService service.UserService
 	// 获取访问令牌和刷新令牌
 	token := c.GetHeader("Authorization")
 	// 让访问令牌失效
-	err := userService.AdminLogout(token)
+	err := userService.UserLogout(token)
 	if err != nil {
 		con.Error(c, nil, err.Error())
 		return
@@ -52,17 +52,17 @@ func (con UserController) AdminLogout(c *gin.Context) {
 	con.Success(c, nil)
 }
 
-// AdminRegister 管理员注册
-// @Summary 管理员注册
-// @Description 管理员注册接口
-// @Tags 管理员
+// Register 注册
+// @Summary 注册
+// @Description 注册接口
+// @Tags 管理员/用户
 // @Accept json
 // @Produce json
-// @Router /admin/register [post]
-func (con UserController) AdminRegister(c *gin.Context) {
+// @Router /register [post]
+func (con UserController) Register(c *gin.Context) {
 	var userService service.UserService
 	// 绑定表单元素
-	if err := c.ShouldBind(&userService); err != nil {
+	if err := c.ShouldBindJSON(&userService); err != nil {
 		con.Error(c, nil, err.Error())
 		return
 	}
@@ -75,13 +75,13 @@ func (con UserController) AdminRegister(c *gin.Context) {
 
 }
 
-// GetAdminInfo 获取管理员基本信息
-// @Summary 获取管理员信息
-// @Description 获取管理员基本信息
-// @Tags 管理员
+// GetUserInfo 获取基本信息
+// @Summary 获取基本信息
+// @Description 获取基本信息
+// @Tags 管理员/用户
 // @Produce json
-// @Router /admin [get]
-func (con UserController) GetAdminInfo(c *gin.Context) {
+// @Router /user [get]
+func (con UserController) GetUserInfo(c *gin.Context) {
 	var userService service.UserService
 	id, _ := c.Get("id")
 	userId, ok := id.(int64)
@@ -103,10 +103,10 @@ func (con UserController) GetAdminInfo(c *gin.Context) {
 
 // RefreshToken 根据刷新令牌，生成新的访问令牌，并和旧的刷新令牌一起返回
 // @Summary 刷新令牌
-// @Description 刷新管理员访问令牌
-// @Tags 管理员
+// @Description 刷新访问令牌
+// @Tags 管理员/用户
 // @Produce json
-// @Router /admin/refresh-token [post]
+// @Router /refresh-token [post]
 func (con UserController) RefreshToken(c *gin.Context) {
 	var userService service.UserService
 	refreshToken := c.GetHeader("Refresh-Token") // 刷新令牌

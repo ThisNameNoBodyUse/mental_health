@@ -1,6 +1,7 @@
 package dao
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"mental/models"
 )
@@ -18,6 +19,12 @@ func NewUserDao(db *gorm.DB) *UserDao {
 func (dao *UserDao) GetUserByAccount(account string) (*models.User, error) {
 	user := new(models.User)
 	res := dao.Where("account = ?", account).First(user)
+
+	// "记录未找到"
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return nil, nil // 不返回错误，而是返回 nil，表示用户不存在
+	}
+	// 其他错误
 	if res.Error != nil {
 		return nil, res.Error
 	}

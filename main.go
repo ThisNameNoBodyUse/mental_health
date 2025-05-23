@@ -53,10 +53,11 @@ func main() {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// 路由初始化
-	routers.InitAdminRouter(r)
+	routers.InitUserRouter(r)
 	routers.InitCommonRouter(r)
+	routers.InitSCLRouter(r)
 
-	// 自动生成 swagger 文档（如果 docs 不存在或首次运行）
+	// 自动生成 swagger 文档
 	err := utils.RunSwagInit()
 	if err != nil {
 		fmt.Printf("Swagger 文档生成失败: %v\n", err)
