@@ -9,6 +9,7 @@ type File struct {
 	Path       string    `json:"path" gorm:"column:path;"`
 	CreateTime time.Time `json:"create_time" gorm:"column:create_time;autoCreateTime"`
 	UpdateTime time.Time `json:"update_time" gorm:"column:update_time;autoCreateTime"`
+	Status     int       `json:"status" gorm:"column:status;"` // 是否已解析
 }
 
 func (File) TableName() string {

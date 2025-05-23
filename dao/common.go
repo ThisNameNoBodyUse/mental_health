@@ -30,3 +30,20 @@ func (dao *FileDao) SaveFile(file_id string, path string) error {
 	res := dao.Save(file)
 	return res.Error
 }
+
+// UpdateStatusAnalyzed 根据文件id，将文件状态设置为已解析
+func (dao *FileDao) UpdateStatusAnalyzed(fileID string) error {
+	return dao.DB.Model(&models.File{}).
+		Where("file_id = ?", fileID).
+		Update("status", 1).Error
+}
+
+// IsFileAnalyzed 根据文件id判断是否已经被解析
+func (dao *FileDao) IsFileAnalyzed(fileID string) (bool, error) {
+	var file models.File
+	err := dao.DB.Select("status").Where("file_id = ?", fileID).First(&file).Error
+	if err != nil {
+		return false, err // 查询出错
+	}
+	return file.Status == 1, nil
+}

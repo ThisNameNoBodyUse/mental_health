@@ -1,11 +1,17 @@
 package utils
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
 	"io"
+	"mental/config"
+	"mime"
+	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 )
@@ -86,4 +92,73 @@ func GenerateFileURL(c *gin.Context, path string) string {
 	serverHost := c.Request.Host
 	// 拼接协议、主机和路径，返回完整的文件 URL
 	return protocol + "://" + serverHost + path[1:]
+}
+
+// UploadFileToMinio 上传文件到 MinIO，并返回文件在桶中的路径
+func UploadFileToMinio(filePath string) (string, error) {
+	// 获取当前日期和扩展名
+	currentDate := time.Now().Format("2006-01-02")
+	ext := filepath.Ext(filePath)
+
+	// 获取文件的 MD5 值作为文件名
+	md5Value, err := GetFileMD5(filePath)
+	if err != nil {
+		return "", fmt.Errorf("获取文件 MD5 时出错: %v", err)
+	}
+
+	// 构造对象名（类似路径）：例如 2025-05-23/abc123.jpg
+	objectName := path.Join(currentDate, md5Value+ext)
+
+	// 打开文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("打开文件失败: %v", err)
+	}
+	defer file.Close()
+
+	// 获取文件信息
+	fileStat, err := file.Stat()
+	if err != nil {
+		return "", fmt.Errorf("获取文件信息失败: %v", err)
+	}
+
+	// 上传到 MinIO
+	_, err = config.MinioClient.PutObject(context.Background(), config.MinioSettings.Bucket, objectName, file, fileStat.Size(), minio.PutObjectOptions{
+		ContentType: GetContentType(file, filePath),
+	})
+	if err != nil {
+		return "", fmt.Errorf("上传到 MinIO 失败: %v", err)
+	}
+
+	// 返回文件路径
+	return GenerateMinioFileURL(objectName), nil
+}
+
+// GenerateMinioFileURL 生成Minio的文件路径
+func GenerateMinioFileURL(objectPath string) string {
+	scheme := "http"
+	if config.MinioSettings.Secure {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s/%s/%s", scheme, config.MinioSettings.Endpoint, config.MinioSettings.Bucket, objectPath)
+}
+
+// GetContentType 根据文件内容或扩展名判断 Content-Type
+func GetContentType(file *os.File, filePath string) string {
+	// 读取前 512 字节来尝试判断 MIME 类型
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err == nil && n > 0 {
+		// 重置文件指针，避免影响后续读取
+		file.Seek(0, io.SeekStart)
+		return http.DetectContentType(buffer[:n])
+	}
+
+	// 如果读取失败或文件太小，则根据扩展名判断
+	ext := filepath.Ext(filePath)
+	contentType := mime.TypeByExtension(ext)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	return contentType
 }

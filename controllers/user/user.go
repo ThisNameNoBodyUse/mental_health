@@ -3,7 +3,6 @@ package user
 import (
 	"github.com/gin-gonic/gin"
 	"mental/controllers/common"
-	"mental/utils"
 )
 import "mental/service"
 
@@ -80,7 +79,7 @@ func (con UserController) Register(c *gin.Context) {
 // @Description 获取基本信息
 // @Tags 管理员/用户
 // @Produce json
-// @Router /user [get]
+// @Router / [get]
 func (con UserController) GetUserInfo(c *gin.Context) {
 	var userService service.UserService
 	id, _ := c.Get("id")
@@ -95,9 +94,9 @@ func (con UserController) GetUserInfo(c *gin.Context) {
 		return
 	}
 	// 拼接头像完整 URL
-	avatarURL := utils.GenerateFileURL(c, userInfo.Avatar)
-	// 返回数据时替换头像字段为完整 URL
-	userInfo.Avatar = avatarURL
+	//avatarURL := utils.GenerateFileURL(c, userInfo.Avatar)
+	//// 返回数据时替换头像字段为完整 URL
+	//userInfo.Avatar = avatarURL
 	con.Success(c, userInfo)
 }
 
