@@ -1,4 +1,4 @@
-package admin
+package user
 
 import (
 	"fmt"
@@ -96,7 +96,10 @@ func (con FileController) Upload(c *gin.Context) {
 	filePath, exists := fileService.CheckFileIsExist(fileMD5)
 	if exists {
 		// 如果已经上传过，直接返回文件路径
-		con.Success(c, utils.GenerateFileURL(c, filePath))
+		con.Success(c, gin.H{
+			"file_path": utils.GenerateFileURL(c, filePath),
+			"file_id":   fileMD5,
+		})
 		return
 	}
 
@@ -108,5 +111,33 @@ func (con FileController) Upload(c *gin.Context) {
 	}
 
 	// 文件保存成功
-	con.Success(c, utils.GenerateFileURL(c, path))
+	con.Success(c, gin.H{
+		"file_path": utils.GenerateFileURL(c, path),
+		"file_id":   fileMD5,
+	})
+}
+
+// TODO 根据传入的file_id，解析文件，插入到scl表
+
+// ParseFile 解析文件接口
+// @Summary 解析文件，插入scl到数据库
+// @Description 解析文件接口
+// @Tags 解析文件
+// @Produce json
+// @Router /common/parse-file [post]
+func (con FileController) ParseFile(c *gin.Context) {
+	fileID := c.Query("file_id") // 获取文件 ID
+	if fileID == "" {
+		con.Error(c, nil, "文件id不可为空！")
+		return
+	}
+	// 初始化 FileService
+	fileService := service.FileService{FileId: fileID}
+	// 文件解析
+	successNum, errorRows := fileService.ImportFromFileId()
+	// 生成返回 JSON
+	con.Success(c, gin.H{
+		"success_num": successNum,
+		"error_rows":  errorRows, // 返回错误信息
+	})
 }
