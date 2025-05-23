@@ -5,4 +5,5 @@ func InitAll() {
 	InitDB()
 	LoadJWTConfig()
 	InitRedis()
+	InitMinio()
 }
