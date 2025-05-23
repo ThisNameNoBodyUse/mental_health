@@ -27,7 +27,7 @@ func JWTMiddleWare() gin.HandlerFunc { // gin.HandlerFunc用于定义中间件
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
-		// Redis黑名单检查是否已经退出登录 4-25
+		// Redis黑名单检查是否已经退出登录
 		jti := claims["jti"].(string)
 		var tokenKey = constant.BlackListPrefix + jti
 		_, err = utils.Get(tokenKey)

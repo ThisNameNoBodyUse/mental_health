@@ -93,7 +93,7 @@ func GenerateJTI() string {
 	return uuid.New().String()
 }
 
-// GetUserRoles 查询用户的角色列表（双写一致性） TODO 2025/5/7
+// GetUserRoles 查询用户的角色列表
 func GetUserRoles(userID int) ([]string, error) {
 	var roles []string
 
