@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"gorm.io/gorm"
 	"time"
 )
 
@@ -63,7 +64,8 @@ type SCL struct {
 	Psychoticism  float32 `json:"psychoticism" gorm:"type:decimal(3,1);not null;comment:精神病性"`
 	Other         float32 `json:"other" gorm:"type:decimal(3,1);not null;comment:其他"`
 
-	CreatedAt time.Time `json:"created_at" gorm:"type:timestamp;autoCreateTime;comment:记录创建时间"`
+	CreatedAt time.Time      `json:"-" gorm:"type:timestamp;autoCreateTime;comment:记录创建时间"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"` // 软删除字段，代表删除时间
 }
 
 // TableName 指定表名为 scl，避免 gorm 自动复数化

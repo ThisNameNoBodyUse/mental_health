@@ -71,8 +71,26 @@ func (sclService *SCLService) CreateSCL(scl *models.SCL) error {
 	return nil
 }
 
-// SelectAllByUserId 根据用户id查询历史所有的评测记录返回 TODO 2025-5-22
-func (s *SCLService) SelectAllByUserId(userd int64) ([]models.SCL, error) {
+// SelectAllByUserId 根据用户id查询历史所有的评测记录返回
+func (s *SCLService) SelectAllByUserId(userId int64) ([]models.SCL, error) {
 	sclDao := dao.NewSCLDao(config.DB)
-	return sclDao.SelectAllByUserId(userd)
+	return sclDao.SelectAllByUserId(userId)
+}
+
+// SelectAll 查询所有用户的scl数据
+func (sclService *SCLService) SelectAll() ([]models.SCL, error) {
+	sclDao := dao.NewSCLDao(config.DB)
+	return sclDao.SelectAll()
+}
+
+// DeleteSCL 删除指定SCL记录
+func (sclService *SCLService) DeleteSCL(id int64) error {
+	sclDao := dao.NewSCLDao(config.DB)
+	return sclDao.DeleteByID(id)
+}
+
+// UpdateSCL 更新指定SCL记录
+func (s *SCLService) UpdateSCL(scl *models.SCL) error {
+	dao := dao.NewSCLDao(config.DB)
+	return dao.UpdateByID(scl.ID, scl)
 }

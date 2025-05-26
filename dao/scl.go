@@ -53,7 +53,32 @@ func (dao *SCLDao) SelectAllByUserId(userId int64) ([]models.SCL, error) {
 	return list, nil
 }
 
+// SelectAll 查找所有的scl记录数据
+func (dao *SCLDao) SelectAll() ([]models.SCL, error) {
+	var list []models.SCL
+	if err := dao.DB.Order("test_date desc").Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 // UpdateByID 根据 ID 更新指定字段
-func (dao *SCLDao) UpdateByID(id int64, updated map[string]interface{}) error {
-	return dao.DB.Model(&models.SCL{}).Where("id = ?", id).Updates(updated).Error
+func (dao *SCLDao) UpdateByID(id int64, scl *models.SCL) error {
+	return dao.DB.Model(&models.SCL{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"student_id":    scl.StudentID,
+		"name":          scl.Name,
+		"gender":        scl.Gender,
+		"age":           scl.Age,
+		"test_date":     scl.TestDate,
+		"somatization":  scl.Somatization,
+		"obsession":     scl.Obsession,
+		"interpersonal": scl.Interpersonal,
+		"depression":    scl.Depression,
+		"anxiety":       scl.Anxiety,
+		"hostility":     scl.Hostility,
+		"phobia":        scl.Phobia,
+		"paranoia":      scl.Paranoia,
+		"psychoticism":  scl.Psychoticism,
+		"other":         scl.Other,
+	}).Error
 }
