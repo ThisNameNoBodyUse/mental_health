@@ -8,6 +8,7 @@ type UserLogin struct {
 	Avatar         string `json:"avatar"`
 	Authentication string `json:"authentication"` // 访问令牌
 	RefreshToken   string `json:"refresh_token"`  // 刷新令牌
+	Role           string `json:"role"`           // 角色id
 }
 
 // UserInfo 用户基本信息数据（管理员）

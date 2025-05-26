@@ -56,6 +56,23 @@ func (userService *UserService) UserLogin() (*serializer.UserLogin, error) {
 	}
 	userLogin.Authentication = accessToken
 	userLogin.RefreshToken = refreshToken
+	// 获取令牌中的角色id列表
+	_, claims, err := utils.ParseJWT(accessToken, true) // 访问令牌解析
+
+	// 获取用户角色列表
+	roles, _ := claims["roles"].([]interface{})
+	flag := false // 是否是管理员
+	for _, role := range roles {
+		if role == "1" {
+			flag = true
+			break
+		}
+	}
+	if flag == true {
+		userLogin.Role = "1" // 管理员
+	} else {
+		userLogin.Role = "2" // 普通用户
+	}
 	return userLogin, nil
 }
 
@@ -182,4 +199,42 @@ func (userService *UserService) RefreshToken(refreshToken string) (string, error
 		return "", errors.New("访问令牌生成失败")
 	}
 	return newAccessToken, nil
+}
+
+// UpdateAvatar 根据用户id修改头像
+func (userService *UserService) UpdateAvatar(userId int64, url string) error {
+	dao := dao.NewUserDao(config.DB)
+	err := dao.UpdateAvatar(userId, url)
+	return err
+}
+
+// UpdateUsernameOrEmail 根据用户id修改用户名/邮箱
+func (userService *UserService) UpdateUsernameOrEmail(id int64, username string, email string) error {
+	dao := dao.NewUserDao(config.DB)
+	err := dao.UpdateUsernameOrEmail(id, username, email)
+	return err
+}
+
+// UpdatePassword 尝试根据用户id、原密码，更新密码
+func (s *UserService) UpdatePassword(userId int64, oldPwd string, newPwd string) error {
+	// 查询用户
+	dao := dao.NewUserDao(config.DB)
+	user, err := dao.GetUserById(userId)
+	if err != nil {
+		return errors.New("用户不存在")
+	}
+
+	// 校验旧密码
+	if !utils.CheckPassword(user.Password, oldPwd) {
+		return errors.New("原密码错误")
+	}
+
+	// 加密新密码
+	hashedPwd, err := utils.HashPassword(newPwd)
+	if err != nil {
+		return errors.New("密码加密失败")
+	}
+
+	// 更新密码
+	return dao.UpdatePassword(userId, hashedPwd)
 }

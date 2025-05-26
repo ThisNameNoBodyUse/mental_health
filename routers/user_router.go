@@ -23,5 +23,11 @@ func InitUserRouter(r *gin.Engine) {
 
 		adminRouter.POST("/refresh-token", user.UserController{}.RefreshToken) // 刷新令牌
 
+		adminRouter.POST("/avatar", user.UserController{}.UpdateUserAvatar) // 修改头像
+
+		adminRouter.POST("/base", user.UserController{}.UpdateUsernameOrEmail) // 修改用户名、邮箱
+
+		adminRouter.POST("/password", user.UserController{}.UpdatePassword) // 修改密码
+
 	}
 }
