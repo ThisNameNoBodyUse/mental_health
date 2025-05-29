@@ -36,12 +36,12 @@ func GenerateJWT(user *models.User, isAccessToken bool) (string, error) {
 
 	// 生成 JWT Claims
 	claims := jwt.MapClaims{
-		"id":       user.Id,               // 用户ID
-		"account":  user.Account,          // 用户账号
-		"username": user.Username,         // 用户名
-		"roles":    roles,                 // 用户角色列表
-		"exp":      expirationTime.Unix(), // 过期时间
-		"jti":      GenerateJTI(),         // JWT 唯一 ID
+		"id":       fmt.Sprintf("%d", user.Id), // 用户ID
+		"account":  user.Account,               // 用户账号
+		"username": user.Username,              // 用户名
+		"roles":    roles,                      // 用户角色列表
+		"exp":      expirationTime.Unix(),      // 过期时间
+		"jti":      GenerateJTI(),              // JWT 唯一 ID
 	}
 
 	// 生成 token

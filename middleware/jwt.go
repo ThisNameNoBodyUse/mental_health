@@ -9,6 +9,7 @@ import (
 	"mental/dao"
 	"mental/utils"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -21,14 +22,21 @@ func JWTMiddleWare() gin.HandlerFunc { // gin.HandlerFunc用于定义中间件
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
 			return
 		}
-		_, claims, err := utils.ParseJWT(token, true) // 访问令牌解析
+
+		// 访问令牌解析
+		_, claims, err := utils.ParseJWT(token, true)
 		if err != nil {
 			// 无效的令牌
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
+
 		// Redis黑名单检查是否已经退出登录
-		jti := claims["jti"].(string)
+		jti, ok := claims["jti"].(string)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			return
+		}
 		var tokenKey = constant.BlackListPrefix + jti
 		_, err = utils.Get(tokenKey)
 		if err == nil {
@@ -41,15 +49,17 @@ func JWTMiddleWare() gin.HandlerFunc { // gin.HandlerFunc用于定义中间件
 			return
 		}
 
-		// 获取 "id" 字段，并将其转换为 float64
-		id, ok := claims["id"].(float64)
+		// 获取 "id" 字段，并将其转换为 int64（由于用字符串存储，需先断言为 string 再转换）
+		idStr, ok := claims["id"].(string)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
-		// 令牌校验成功，将必要信息存入gin上下文中
-		// 将 float64 类型的 id 转换为 int64
-		userId := int64(id)
+		userId, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID format"})
+			return
+		}
 
 		// 获取用户角色列表
 		roles, ok := claims["roles"].([]interface{})
@@ -57,9 +67,9 @@ func JWTMiddleWare() gin.HandlerFunc { // gin.HandlerFunc用于定义中间件
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
+
 		// 获取用户权限列表
 		var permissions []string
-
 		for _, role := range roles {
 			roleID := fmt.Sprintf("%v", role)
 
@@ -100,7 +110,6 @@ func JWTMiddleWare() gin.HandlerFunc { // gin.HandlerFunc用于定义中间件
 		fmt.Println("requestKey : " + requestKey)
 
 		hasPermission := false
-
 		for _, permission := range permissions {
 			permID := fmt.Sprintf("%v", permission)
 			key := constant.APIPermissionPrefix + permID
@@ -135,6 +144,7 @@ func JWTMiddleWare() gin.HandlerFunc { // gin.HandlerFunc用于定义中间件
 					}
 				}
 			}
+
 			// 检查该权限对应的接口集合中是否包含当前请求
 			inSet, err := utils.SIsMember(key, requestKey)
 			if err != nil {
@@ -152,8 +162,10 @@ func JWTMiddleWare() gin.HandlerFunc { // gin.HandlerFunc用于定义中间件
 			return
 		}
 
+		// 令牌校验成功，将必要信息存入gin上下文中
 		c.Set("id", userId)
 		c.Set("account", claims["account"].(string))
+
 		// 放行
 		c.Next()
 	}
