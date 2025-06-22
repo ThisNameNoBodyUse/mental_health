@@ -64,6 +64,9 @@ type SCL struct {
 	Psychoticism  float32 `json:"psychoticism" gorm:"type:decimal(3,1);not null;comment:精神病性"`
 	Other         float32 `json:"other" gorm:"type:decimal(3,1);not null;comment:其他"`
 
+	TotalScore    float64 `json:"total_score" gorm:"type:int;default:0;comment:总分（估算值）"`
+	PositiveItems float64 `json:"positive_items" gorm:"type:int;default:0;comment:阳性项目数（因子>=2的数量）"`
+
 	CreatedAt time.Time      `json:"-" gorm:"type:timestamp;autoCreateTime;comment:记录创建时间"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"` // 软删除字段，代表删除时间
 }
