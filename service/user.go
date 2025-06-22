@@ -17,6 +17,7 @@ import (
 type UserService struct {
 	Account  string `json:"account"`
 	Password string `json:"password"`
+	Username string `json:"username"`
 	RoleId   string `json:"role_id"`
 }
 
@@ -43,7 +44,7 @@ func (userService *UserService) UserLogin() (*serializer.UserLogin, error) {
 
 	// 比对成功，进行登录，申请访问令牌和刷新令牌，封装到UserLogin中返回
 	userLogin := new(serializer.UserLogin)
-	copier.Copy(userLogin, user) // 后面拷贝到前面
+	copier.Copy(userLogin, user)
 
 	// 生成双令牌
 	accessToken, err := utils.GenerateJWT(user, true)
@@ -85,6 +86,9 @@ func (userService *UserService) UserRegister() (bool, error) {
 	if userService.Password == "" {
 		return false, errors.New("密码不能为空")
 	}
+	if userService.Username == "" {
+		return false, errors.New("用户名不能为空")
+	}
 	if userService.RoleId == "" {
 		return false, errors.New("角色不能为空")
 	}
@@ -103,7 +107,7 @@ func (userService *UserService) UserRegister() (bool, error) {
 	}
 	defer utils.Unlock(lock)
 
-	// 包装事务处理
+	// 事务处理
 	err = config.DB.Transaction(func(tx *gorm.DB) error {
 		userDao := dao.NewUserDao(tx)
 		existingUser, err := userDao.GetUserByAccount(userService.Account)
@@ -126,6 +130,7 @@ func (userService *UserService) UserRegister() (bool, error) {
 		newUser := &models.User{
 			Account:  userService.Account,
 			Password: hashedPwd,
+			Username: userService.Username,
 		}
 		newUser.Id = int(id)
 		if err := tx.Create(newUser).Error; err != nil {
@@ -167,7 +172,7 @@ func (userService *UserService) GetUserInfoById(id int64) (*serializer.UserInfo,
 func (userService *UserService) UserLogout(token string) error {
 	_, claims, _ := utils.ParseJWT(token, true)
 	accessJti := claims["jti"].(string) // 访问令牌的jti
-	// 将访问令牌的 jti 存入 Redis 黑名单，并设置过期时间
+	// 将访问令牌jti存入 Redis黑名单
 	expirationTime := time.Unix(int64(claims["exp"].(float64)), 0)
 	ttl := expirationTime.Sub(time.Now())
 	accessKey := constant.BlackListPrefix + accessJti // 访问令牌在redis中的key
